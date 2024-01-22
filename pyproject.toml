@@ -10,7 +10,14 @@ readme = "README.md"
 python = "^3.10"
 fastapi = "^0.109.0"
 uvicorn = {extras = ["standard"], version = "^0.26.0"}
+fastapi-security = "^0.5.0"
+sqlalchemy = "^2.0.25"
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
 
+
+[tool.poetry.group.dev.dependencies]
+black = "^23.12.1"
 
 [build-system]
 requires = ["poetry-core"]
