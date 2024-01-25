@@ -3,12 +3,23 @@ import requests
 
 BASE_URL = "http://127.0.0.1:8000"
 
+def show_user_profile():
+    # Здесь предполагается, что токен уже сохранен в st.session_state['token']
+    headers = {"Authorization": f"Bearer {st.session_state['token']}"}
+    response = requests.get(f"{BASE_URL}/users/me/", headers=headers)
+    if response.status_code == 200:
+        user_data = response.json()
+        st.write(f"Привет, {user_data['username']}! Ваш баланс токенов: {user_data['tokens']}")
+    else:
+        st.error("Ошибка при загрузке профиля пользователя.")
 
 def predict_page():
     st.subheader("Получите предсказание")
     model_name = st.selectbox(
         "Выберите модель", ["logistic_regression", "xgboost", "svm"]
     )
+    if "token" in st.session_state:
+        show_user_profile()
     uploaded_file = st.file_uploader("Загрузите CSV файл", type="csv")
     if uploaded_file is not None and st.button("Получить предсказание"):
         # После загрузки файла, отправьте его на сервер и получите предсказания

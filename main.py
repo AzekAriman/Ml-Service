@@ -43,6 +43,8 @@ ml_models = {
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token/")
 
+
+
 async def get_current_active_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -178,11 +180,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
 async def read_users_me(current_user: models.User = Depends(get_current_active_user)):
     return current_user
 
-
-@app.get("/test_db")
-def test_db(db: Session = Depends(get_db)):
-    users = db.query(User).all()
-    return users
 
 
 if __name__ == "__main__":
