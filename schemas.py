@@ -19,3 +19,6 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str | None = None
+
+class TokenRecharge(BaseModel):
+    recharge_amount: int

@@ -17,9 +17,8 @@ from passlib.context import CryptContext
 from models import User  # Импортируем модель пользователя
 from schemas import UserCreate  # Импортируем схему создания пользователя
 from datetime import datetime, timedelta
-from jose import jwt
+from jose import jwt, JWTError
 from fastapi.security import OAuth2PasswordBearer
-
 
 
 # Определение доступных моделей как перечисления
@@ -44,8 +43,9 @@ ml_models = {
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token/")
 
 
-
-async def get_current_active_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+async def get_current_active_user(
+    db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -73,13 +73,16 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30  # время жизни токена
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Эндпоинт для загрузки файла и получения предсказаний
 
+
 # Утилита для получения пользователя по имени
 def get_user(db: Session, username: str):
     return db.query(User).filter(User.username == username).first()
 
+
 # Утилита для проверки пароля
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
+
 
 # Утилита для аутентификации пользователя
 def authenticate_user(db: Session, username: str, password: str):
@@ -89,6 +92,7 @@ def authenticate_user(db: Session, username: str, password: str):
     if not verify_password(password, user.hashed_password):
         return False
     return user
+
 
 # Функция для создания JWT токена
 def create_access_token(data: dict, expires_delta: timedelta = None):
@@ -101,12 +105,15 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+
 @app.post("/predict/{model_name}")
 async def create_upload_file(
     model_name: ModelName,
     file: UploadFile = File(...),
-    current_user: models.User = Depends(get_current_active_user),  # Добавлена проверка авторизации
-    db: Session = Depends(get_db)
+    current_user: models.User = Depends(
+        get_current_active_user
+    ),  # Добавлена проверка авторизации
+    db: Session = Depends(get_db),
 ):
     # Проверяем, достаточно ли у пользователя токенов
     if current_user.tokens <= 0:
@@ -141,6 +148,7 @@ async def create_upload_file(
     # Возврат предсказаний
     return {"predictions": predictions.tolist()}
 
+
 # Эндпоинт для регистрации пользователя
 @app.post("/register/", response_model=schemas.UserOut)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
@@ -161,8 +169,28 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     # Возвращаем данные нового пользователя
     return new_user
 
+@app.post("/users/me/tokens/recharge/")
+async def recharge_tokens(
+    token_recharge: schemas.TokenRecharge,  # Использование модели Pydantic для валидации входящих данных
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    recharge_amount = token_recharge.recharge_amount  # Извлечение значения из валидированной модели
+
+    if recharge_amount < 0:
+        raise HTTPException(status_code=400, detail="Invalid recharge amount")
+
+    current_user.tokens += recharge_amount
+    db.commit()
+    return {
+        "message": "Balance updated successfully",
+        "current_balance": current_user.tokens,
+    }
+
 @app.post("/token/", response_model=schemas.Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)
+):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -176,10 +204,10 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 @app.get("/users/me/", response_model=schemas.UserOut)
 async def read_users_me(current_user: models.User = Depends(get_current_active_user)):
     return current_user
-
 
 
 if __name__ == "__main__":

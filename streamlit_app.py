@@ -3,36 +3,79 @@ import requests
 
 BASE_URL = "http://127.0.0.1:8000"
 
+
 def show_user_profile():
     # Здесь предполагается, что токен уже сохранен в st.session_state['token']
     headers = {"Authorization": f"Bearer {st.session_state['token']}"}
     response = requests.get(f"{BASE_URL}/users/me/", headers=headers)
     if response.status_code == 200:
         user_data = response.json()
-        st.write(f"Привет, {user_data['username']}! Ваш баланс токенов: {user_data['tokens']}")
+        st.write(
+            f"Привет, {user_data['username']}! Ваш баланс токенов: {user_data['tokens']}"
+        )
     else:
         st.error("Ошибка при загрузке профиля пользователя.")
 
+
 def predict_page():
     st.subheader("Получите предсказание")
-    model_name = st.selectbox(
-        "Выберите модель", ["logistic_regression", "xgboost", "svm"]
-    )
-    if "token" in st.session_state:
-        show_user_profile()
-    uploaded_file = st.file_uploader("Загрузите CSV файл", type="csv")
-    if uploaded_file is not None and st.button("Получить предсказание"):
-        # После загрузки файла, отправьте его на сервер и получите предсказания
-        files = {"file": uploaded_file.read()}
-        headers = {"Authorization": f"Bearer {st.session_state['token']}"}
-        response = requests.post(
-            f"{BASE_URL}/predict/{model_name}", files=files, headers=headers
-        )
-        if response.status_code == 200:
-            predictions = response.json()
-            st.write(predictions)
+
+    # Функция для получения и отображения баланса токенов пользователя
+    def show_user_tokens():
+        user_info_response = requests.get(f"{BASE_URL}/users/me/", headers=headers)
+        if user_info_response.status_code == 200:
+            user_info = user_info_response.json()
+            st.write(f"Ваш баланс токенов: {user_info['tokens']}")
         else:
-            st.error("Произошла ошибка при запросе предсказаний")
+            st.error("Не удалось загрузить информацию о пользователе.")
+
+    if "token" in st.session_state:
+        headers = {"Authorization": f"Bearer {st.session_state['token']}"}
+
+        # Поле и кнопка для пополнения баланса токенов
+        recharge_amount = st.number_input(
+            "Введите количество токенов для пополнения",
+            min_value=1,
+            value=10,
+            step=1,
+        )
+        if st.button("Пополнить баланс"):
+            recharge_response = requests.post(
+                f"{BASE_URL}/users/me/tokens/recharge/",
+                headers=headers,
+                json={"recharge_amount": recharge_amount},
+            )
+            if recharge_response.status_code == 200:
+                st.success("Баланс успешно пополнен.")
+                # Заново запросить и отобразить обновленный баланс токенов
+                show_user_tokens()
+            else:
+                st.error("Произошла ошибка при пополнении баланса.")
+        else:
+            # Отображение текущего баланса токенов (вызывается только если кнопка не нажата)
+            show_user_tokens()
+        # Выбор модели для предсказания
+        model_name = st.selectbox(
+            "Выберите модель", ["logistic_regression", "xgboost", "svm"]
+        )
+
+        # Загрузка файла для предсказания
+        uploaded_file = st.file_uploader("Загрузите CSV файл", type="csv")
+        if uploaded_file is not None and st.button("Получить предсказание"):
+            files = {"file": uploaded_file.getvalue()}
+            predict_response = requests.post(
+                f"{BASE_URL}/predict/{model_name}", files=files, headers=headers
+            )
+            if predict_response.status_code == 200:
+                predictions = predict_response.json()["predictions"]
+                st.write("Предсказания модели:")
+                st.write(predictions)
+            else:
+                st.error("Произошла ошибка при получении предсказаний.")
+    else:
+        st.error(
+            "Пожалуйста, войдите в систему, чтобы получить доступ к предсказаниям."
+        )
 
 
 def register_user():
